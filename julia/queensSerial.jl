@@ -7,9 +7,10 @@ struct Subproblem
 	subproblem_is_visited::Array{Int64,1}
  	subproblem_partial_permutation::Array{Int64,1}
 
+	Subproblem(size) = (subproblem_is_visited = zeros(Int64,size); subproblem_partial_permutation = zeros(Int64,size))
 
 	setVisited(visited_::Array{Int64,1}) = ( subproblem_is_visited = visited_)
-	setPermutation(permutation_::Array{Int64,1}) = (	subproblem_partial_permutation = permutation_)
+	setPermutation(permutation_::Array{Int64,1}) = ( subproblem_partial_permutation = permutation_ )
 
 
 end
@@ -108,7 +109,7 @@ println(tree_size)
 end #queens serial
 
 
-function queens_partial_search(size, cutoff_depth, subproblems_pool::AbstractArray{Subproblem})::Metrics
+function queens_partial_search!(size, cutoff_depth, subproblems_pool::AbstractArray{Subproblem,N} where N)::Metrics
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -147,8 +148,8 @@ function queens_partial_search(size, cutoff_depth, subproblems_pool::AbstractArr
 
 				if depth == cutoff_depth ##complete solution -- full, feasible and valid solution
 					number_of_subproblems+=1
-					subproblems[number_of_subproblems].setPermutation(local_permutation)
-					subproblems[number_of_subproblems].setVisited(local_visited)
+					subproblems_pool[number_of_subproblems].setPermutation(local_permutation)
+					subproblems_pool[number_of_subproblems].setVisited(local_visited)
 					#my_print(local_cycle)
 				else
 					continue
@@ -166,12 +167,10 @@ function queens_partial_search(size, cutoff_depth, subproblems_pool::AbstractArr
 		end #if depth<2
 	end
 
-	println(subproblems)
+	println(subproblems_pool)
 	metrics = Metrics(tree_size , number_of_subproblems)
 	println(metrics)
 	return metrics
-
-
 end
 
 println("Number of solutions: ")
@@ -184,6 +183,8 @@ println(ARGS)
 size = parse(Int64,ARGS[1])
 cutoff_depth = parse(Int64, ARGS[2])
 
-subproblems = Array{Subproblem, 1}(undef, 99999)
+#subproblems = Array{Subproblem, 1}(undef, 99999)
 
-queens_partial_search(size+1,cutoff_depth,subproblems)
+subproblems = [Subproblem(size) for i in 1:99999]
+#println(subproblems)
+queens_partial_search!(size+1,cutoff_depth,subproblems)
