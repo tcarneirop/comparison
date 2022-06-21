@@ -2,18 +2,22 @@
 
 ##@TODO: Queens -- we receive the three one unity bigger than it should be. Lets see this problem afterwards.
 ###
-struct Subproblem
+mutable struct Subproblem
 
-	subproblem_is_visited::Array{Int64,1}
- 	subproblem_partial_permutation::Array{Int64,1}
+	subproblem_is_visited::Array{Int64}
+ 	subproblem_partial_permutation::Array{Int64}
 
-	Subproblem(size) = (subproblem_is_visited = zeros(Int64,size); subproblem_partial_permutation = zeros(Int64,size))
-
-	setVisited(visited_::Array{Int64,1}) = ( subproblem_is_visited = visited_)
-	setPermutation(permutation_::Array{Int64,1}) = ( subproblem_partial_permutation = permutation_ )
-
+	Subproblem(size) = new(zeros(Int64,size), zeros(Int64,size))
 
 end
+
+function setVisited(s::Subproblem, visited_::Array{Int64,1})  
+	s.subproblem_is_visited = visited_;
+end
+function setPermutation(s::Subproblem, permutation_::Array{Int64,1}) 
+	s.subproblem_partial_permutation = permutation_;
+end
+
 
 struct Metrics
 
@@ -148,8 +152,8 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool::AbstractAr
 
 				if depth == cutoff_depth ##complete solution -- full, feasible and valid solution
 					number_of_subproblems+=1
-					subproblems_pool[number_of_subproblems].setPermutation(local_permutation)
-					subproblems_pool[number_of_subproblems].setVisited(local_visited)
+					setPermutation(subproblems_pool[number_of_subproblems], local_permutation)
+					setVisited(subproblems_pool[number_of_subproblems], local_visited)
 					#my_print(local_cycle)
 				else
 					continue
@@ -186,5 +190,5 @@ cutoff_depth = parse(Int64, ARGS[2])
 #subproblems = Array{Subproblem, 1}(undef, 99999)
 
 subproblems = [Subproblem(size) for i in 1:99999]
-#println(subproblems)
+println(typeof(subproblems))
 queens_partial_search!(size+1,cutoff_depth,subproblems)
