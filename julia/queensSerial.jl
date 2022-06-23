@@ -7,16 +7,16 @@ mutable struct Subproblem
 	subproblem_is_visited::Array{Int64}
  	subproblem_partial_permutation::Array{Int64}
 
-	Subproblem(size) = new(zeros(Int64,size), zeros(Int64,size))
+#	Subproblem(size) = new(zeros(Int64,size), zeros(Int64,size))
 
 end
 
-function setVisited(s::Subproblem, visited_::Array{Int64,1})
-	s.subproblem_is_visited = visited_;
-end
-function setPermutation(s::Subproblem, permutation_::Array{Int64,1})
-	s.subproblem_partial_permutation = permutation_;
-end
+#function setVisited(s::Subproblem, visited_::Array{Int64,1})
+#	s.subproblem_is_visited = visited_;
+#end
+#function setPermutation(s::Subproblem, permutation_::Array{Int64,1})
+#	s.subproblem_partial_permutation = permutation_;
+#end
 
 mutable struct Metrics
 
@@ -111,7 +111,7 @@ println(number_of_solutions)
 println(tree_size)
 end #queens serial
 
-function queens_partial_search!(size, cutoff_depth, subproblems_pool::AbstractArray{Subproblem,N} where N)::Metrics
+function queens_partial_search!(size, cutoff_depth, subproblems_pool)::Metrics
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -126,7 +126,7 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool::AbstractAr
 
 	depth = 1
 	tree_size = 0
-	number_of_subproblems = 0
+	#number_of_subproblems = 0
 
 	local_visited = zeros(Int64,size)
 	local_permutation = zeros(Int64,size)
@@ -145,9 +145,12 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool::AbstractAr
 				tree_size+=1
 
 				if depth == cutoff_depth+1 ##complete solution -- full, feasible and valid solution
-					number_of_subproblems+=1
-					setPermutation(subproblems_pool[number_of_subproblems], copy(local_permutation))
-					setVisited(subproblems_pool[number_of_subproblems], copy(local_visited))
+					#number_of_subproblems+=1
+
+                    push!(subproblems_pool, Subproblem(copy(local_visited), copy(local_permutation)))
+
+					#setPermutation(subproblems_pool[number_of_subproblems], copy(local_permutation))
+					#setVisited(subproblems_pool[number_of_subproblems], copy(local_visited))
 					#println(" Subproblem ", number_of_subproblems)
 					#println(subproblems_pool[number_of_subproblems])
 				else
@@ -166,7 +169,9 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool::AbstractAr
 		end #if depth<2
 	end
 
-	#println(subproblems_pool)
+	number_of_subproblems = length(subproblems_pool)
+	println(number_of_subproblems)
+
 	metrics = Metrics(number_of_subproblems, tree_size)
 	println(metrics)
 	return metrics
@@ -185,9 +190,12 @@ function queens_tree_explorer(size,cutoff_depth, s::Subproblem)::Metrics
 	depth = cutoff_depth+1
 	tree_size = 0
 	number_of_solutions = 0
+	
 	local_visited = copy(s.subproblem_is_visited)
 	local_permutation = copy(s.subproblem_partial_permutation)
 
+	#local_visited = s.subproblem_is_visited
+	#local_permutation = s.subproblem_partial_permutation
 
 	#println(local_visited)
 	#println(local_permutation)
@@ -237,7 +245,8 @@ function queens_caller(size,cutoff_depth)
 
 	print("Starting N-Queens of size ")
 	println(size-1)
-	subproblems = [Subproblem(size) for i in 1:1000000]
+	#subproblems = [Subproblem(size) for i in 1:1000000]
+	subproblems = []
 
 	@time begin
 	#partial search -- generate some feasible valid and incomplete solutions
