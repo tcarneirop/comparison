@@ -69,7 +69,6 @@ function queens_serial(size)
 	println(local_visited)
 	println(local_permutation)
 
-	@time begin
 	while true
 		#%println(local_cycle)
 
@@ -104,7 +103,6 @@ function queens_serial(size)
 
 
 	end
-end
 
 println("Number of solutions: ")
 println(number_of_solutions)
@@ -179,7 +177,7 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool)::Metrics
 end #queens partial
 
 
-function queens_tree_explorer(size,cutoff_depth, s::Subproblem)::Metrics
+function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutation #=s::Subproblem=#)::Metrics
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -191,8 +189,8 @@ function queens_tree_explorer(size,cutoff_depth, s::Subproblem)::Metrics
 	tree_size = 0
 	number_of_solutions = 0
 	
-	local_visited = copy(s.subproblem_is_visited)
-	local_permutation = copy(s.subproblem_partial_permutation)
+	#local_visited = copy(s.subproblem_is_visited)
+	#local_permutation = copy(s.subproblem_partial_permutation)
 
 	#local_visited = s.subproblem_is_visited
 	#local_permutation = s.subproblem_partial_permutation
@@ -248,7 +246,6 @@ function queens_caller(size,cutoff_depth,num_threads)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 	subproblems = []
 
-	@time begin
 	#partial search -- generate some feasible valid and incomplete solutions
 	metrics = @time queens_partial_search!(size,cutoff_depth,subproblems)
 	println("PARTIAL SEARCH")
@@ -270,36 +267,36 @@ function queens_caller(size,cutoff_depth,num_threads)
 			println("LOOP " * string(ii))
 			local i = ii
 			Threads.@spawn begin
-								println("THREAD: " * string(i))
+								println("THREAD: " * string(i) * " has " * string(N) * " iterations")
 								for j in 1:N
 						#		for s in 1:number_of_subproblems
 									s = i*N + j
-									metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s])
+									metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
 									number_of_solutions += metrics.number_of_solutions
 									partial_tree_size  += metrics.partial_tree_size
 									#println("Subproblema:",s, " number of sols: ",number_of_solutions," tree: " ,partial_tree_size)
 								end
 			end
 		end
-    end
+	end
 	println("Number of sols: ",number_of_solutions, " tree: " ,partial_tree_size)
-	end#timer
 end #caller
 
 
 
 function main(ARGS)
 	println(ARGS)
-	size = parse(Int64,ARGS[2])
-	cutoff_depth = parse(Int64, ARGS[3])
 	mode = parse(Int64, ARGS[1])
+	size = parse(Int64,ARGS[2])
 
 	if mode == 1
-		queens_serial(size+1)
-	end
-	if mode == 2
-		num_threads =  parse(Int64, ARGS[4])
-		queens_caller(size+1,cutoff_depth+1, num_threads)
+		@time queens_serial(size+1)
+	elseif mode == 2
+		@time begin
+			cutoff_depth = parse(Int64, ARGS[3])
+			num_threads =  parse(Int64, ARGS[4])
+			queens_caller(size+1,cutoff_depth+1, num_threads)
+		end
 	end
 
 	#subproblems = Array{Subproblem, 1}(undef, 99999)
