@@ -241,7 +241,7 @@ return metrics
 end #queens tree explorer
 
 
-function queens_caller(size,cutoff_depth)
+function queens_caller(size,cutoff_depth,num_threads)
 
 	print("Starting N-Queens of size ")
 	println(size-1)
@@ -250,7 +250,8 @@ function queens_caller(size,cutoff_depth)
 
 	@time begin
 	#partial search -- generate some feasible valid and incomplete solutions
-	metrics = queens_partial_search!(size,cutoff_depth,subproblems)
+	metrics = @time queens_partial_search!(size,cutoff_depth,subproblems)
+	println("PARTIAL SEARCH")
 	#end of the partial search
 	number_of_subproblems = metrics.number_of_solutions
 	partial_tree_size = metrics.partial_tree_size
@@ -261,12 +262,26 @@ function queens_caller(size,cutoff_depth)
 	println(metrics)
 	#println(subproblems[72])
 	#we parallelize it here
-	for s in 1:number_of_subproblems
-		metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s])
-		number_of_solutions += metrics.number_of_solutions
-		partial_tree_size  += metrics.partial_tree_size
-		#println("Subproblema:",s, " number of sols: ",number_of_solutions," tree: " ,partial_tree_size)
-	end
+	P = num_threads
+	N = div(number_of_subproblems,P)
+
+	@sync begin
+		for ii in 0:(P-1)
+			println("LOOP " * string(ii))
+			local i = ii
+			Threads.@spawn begin
+								println("THREAD: " * string(i))
+								for j in 1:N
+						#		for s in 1:number_of_subproblems
+									s = i*N + j
+									metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s])
+									number_of_solutions += metrics.number_of_solutions
+									partial_tree_size  += metrics.partial_tree_size
+									#println("Subproblema:",s, " number of sols: ",number_of_solutions," tree: " ,partial_tree_size)
+								end
+			end
+		end
+    end
 	println("Number of sols: ",number_of_solutions, " tree: " ,partial_tree_size)
 	end#timer
 end #caller
@@ -283,7 +298,8 @@ function main(ARGS)
 		queens_serial(size+1)
 	end
 	if mode == 2
-		queens_caller(size+1,cutoff_depth+1)
+		num_threads =  parse(Int64, ARGS[4])
+		queens_caller(size+1,cutoff_depth+1, num_threads)
 	end
 
 	#subproblems = Array{Subproblem, 1}(undef, 99999)
