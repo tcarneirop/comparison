@@ -109,7 +109,7 @@ println(number_of_solutions)
 println(tree_size)
 end #queens serial
 
-function queens_partial_search!(size, cutoff_depth, subproblems_pool)::Metrics
+function queens_partial_search!(size, cutoff_depth)
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -121,6 +121,7 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool)::Metrics
 	print("Partial search until cutoff ")
 	println(cutoff_depth)
 
+	subproblems_pool = []
 
 	depth = 1
 	tree_size = 0
@@ -172,7 +173,8 @@ function queens_partial_search!(size, cutoff_depth, subproblems_pool)::Metrics
 
 	metrics = Metrics(number_of_subproblems, tree_size)
 	println(metrics)
-	return metrics
+
+	return (subproblems_pool, metrics)
 
 end #queens partial
 
@@ -244,10 +246,9 @@ function queens_caller(size,cutoff_depth,num_threads)
 	print("Starting N-Queens of size ")
 	println(size-1)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
-	subproblems = []
-
+	
 	#partial search -- generate some feasible valid and incomplete solutions
-	metrics = @time queens_partial_search!(size,cutoff_depth,subproblems)
+	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
 	println("PARTIAL SEARCH")
 	#end of the partial search
 	number_of_subproblems = metrics.number_of_solutions
