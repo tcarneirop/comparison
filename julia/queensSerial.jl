@@ -190,7 +190,7 @@ function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutatio
 	depth = cutoff_depth+1
 	tree_size = 0
 	number_of_solutions = 0
-	
+
 	#local_visited = copy(s.subproblem_is_visited)
 	#local_permutation = copy(s.subproblem_partial_permutation)
 
@@ -246,7 +246,7 @@ function queens_caller(size,cutoff_depth,num_threads)
 	print("Starting N-Queens of size ")
 	println(size-1)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
-	
+
 	#partial search -- generate some feasible valid and incomplete solutions
 	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
 	println("PARTIAL SEARCH")
@@ -268,15 +268,15 @@ function queens_caller(size,cutoff_depth,num_threads)
 			println("LOOP " * string(ii))
 			local i = ii
 			Threads.@spawn begin
-								println("THREAD: " * string(i) * " has " * string(N) * " iterations")
-								for j in 1:N
-						#		for s in 1:number_of_subproblems
-									s = i*N + j
-									metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
-									number_of_solutions += metrics.number_of_solutions
-									partial_tree_size  += metrics.partial_tree_size
-									#println("Subproblema:",s, " number of sols: ",number_of_solutions," tree: " ,partial_tree_size)
-								end
+				println("THREAD: " * string(i) * " has " * string(N) * " iterations")
+				for j in 1:N
+		#		for s in 1:number_of_subproblems
+					s = i*N + j
+					metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
+					number_of_solutions += metrics.number_of_solutions
+					partial_tree_size  += metrics.partial_tree_size
+					#println("Subproblema:",s, " number of sols: ",number_of_solutions," tree: " ,partial_tree_size)
+				end
 			end
 		end
 	end
