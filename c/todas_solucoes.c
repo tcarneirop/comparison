@@ -18,7 +18,7 @@
 
 unsigned long long int qtd = 0ULL;
 
-int N = 12;
+int N = 13;
 int upper_bound = INFINITO;
 
 

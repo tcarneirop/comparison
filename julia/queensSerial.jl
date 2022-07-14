@@ -1,5 +1,6 @@
 
 
+
 ##@TODO: Queens -- we receive the three one unity bigger than it should be. Lets see this problem afterwards.
 ###
 mutable struct Subproblem
@@ -7,16 +8,8 @@ mutable struct Subproblem
 	subproblem_is_visited::Array{Int64}
  	subproblem_partial_permutation::Array{Int64}
 
-#	Subproblem(size) = new(zeros(Int64,size), zeros(Int64,size))
-
 end
 
-#function setVisited(s::Subproblem, visited_::Array{Int64,1})
-#	s.subproblem_is_visited = visited_;
-#end
-#function setPermutation(s::Subproblem, permutation_::Array{Int64,1})
-#	s.subproblem_partial_permutation = permutation_;
-#end
 
 mutable struct Metrics
 
@@ -145,13 +138,7 @@ function queens_partial_search!(size, cutoff_depth)
 
 				if depth == cutoff_depth+1 ##complete solution -- full, feasible and valid solution
 					#number_of_subproblems+=1
-
                     push!(subproblems_pool, Subproblem(copy(local_visited), copy(local_permutation)))
-
-					#setPermutation(subproblems_pool[number_of_subproblems], copy(local_permutation))
-					#setVisited(subproblems_pool[number_of_subproblems], copy(local_visited))
-					#println(" Subproblem ", number_of_subproblems)
-					#println(subproblems_pool[number_of_subproblems])
 				else
 					continue
 				end
@@ -190,16 +177,6 @@ function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutatio
 	depth = cutoff_depth+1
 	tree_size = 0
 	number_of_solutions = 0
-
-	#local_visited = copy(s.subproblem_is_visited)
-	#local_permutation = copy(s.subproblem_partial_permutation)
-
-	#local_visited = s.subproblem_is_visited
-	#local_permutation = s.subproblem_partial_permutation
-
-	#println(local_visited)
-	#println(local_permutation)
-
 
 	while true
 		#%println(local_cycle)
@@ -249,38 +226,48 @@ function queens_caller(size,cutoff_depth,num_threads)
 
 	#partial search -- generate some feasible valid and incomplete solutions
 	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
-	println("PARTIAL SEARCH")
 	#end of the partial search
+
 	number_of_subproblems = metrics.number_of_solutions
 	partial_tree_size = metrics.partial_tree_size
 	number_of_solutions = 0
 	metrics.number_of_solutions = 0
 	println(number_of_subproblems)
-
 	println(metrics)
-	#println(subproblems[72])
-	#we parallelize it here
-	P = num_threads
-	N = div(number_of_subproblems,P)
+
+	thread_tree_size = zeros(Int64, num_threads)
+	thread_num_sols  = zeros(Int64, num_threads)
+	thread_load = fill(div(number_of_subproblems, num_threads), num_threads)
+	stride = div(number_of_subproblems, num_threads)
+	println(thread_load)
+	thread_load[num_threads] += mod(number_of_subproblems, num_threads)
 
 	@sync begin
-		for ii in 0:(P-1)
+		for ii in 0:(num_threads-1)
+
 			println("LOOP " * string(ii))
-			local i = ii
+			local local_thread_id = ii
+			local local_load = thread_load[local_thread_id+1]
+			local local_metrics = Metrics(0,0)
+
 			Threads.@spawn begin
-				println("THREAD: " * string(i) * " has " * string(N) * " iterations")
-				for j in 1:N
-		#		for s in 1:number_of_subproblems
-					s = i*N + j
-					metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
-					number_of_solutions += metrics.number_of_solutions
-					partial_tree_size  += metrics.partial_tree_size
-					#println("Subproblema:",s, " number of sols: ",number_of_solutions," tree: " ,partial_tree_size)
+				println("THREAD: " * string(local_thread_id) * " has " * string(local_load) * " iterations")
+				for j in 1:local_load
+
+					s = local_thread_id*stride + j
+
+					local_metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
+					thread_tree_size[local_thread_id+1] += local_metrics.partial_tree_size
+					thread_num_sols[local_thread_id+1]  += local_metrics.number_of_solutions
 				end
 			end
+
 		end
 	end
-	println("Number of sols: ",number_of_solutions, " tree: " ,partial_tree_size)
+	number_of_solutions = sum(thread_num_sols)
+	partial_tree_size += sum(thread_tree_size)
+	println("\n###########################")
+	println("N-Queens size: ", size, "\nNumber of threads: ", num_threads ,"\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
 
 
