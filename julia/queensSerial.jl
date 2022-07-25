@@ -3,6 +3,11 @@
 
 ##@TODO: Queens -- we receive the three one unity bigger than it should be. Lets see this problem afterwards.
 ###
+
+using Pkg
+Pkg.add("CUDA")
+using CUDA
+
 mutable struct Subproblem
 
 	subproblem_is_visited::Array{Int64}
@@ -217,10 +222,9 @@ return metrics
 
 end #queens tree explorer
 
+function queens_mcore_caller(size,cutoff_depth,num_threads)
 
-function queens_caller(size,cutoff_depth,num_threads)
-
-	print("Starting N-Queens of size ")
+	print("Starting MCORE N-Queens of size ")
 	println(size-1)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
@@ -271,6 +275,116 @@ function queens_caller(size,cutoff_depth,num_threads)
 end #caller
 
 
+function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefixes, controls,subproblems)
+
+	for sub in 0:num_subproblems-1
+		stride = sub*cutoff_depth
+		for j in 1:cutoff_depth
+			prefixes[stride+j] = subproblems[sub+1].subproblem_partial_permutation[j]
+			controls[stride+j] = subproblems[sub+1].subproblem_is_visited[j]
+		end 
+	end
+
+end
+
+
+
+function gpu_queens_tree_explorer(size,cutoff_depth, subroblem_index, prefixes, controls, tree_size, number_of_solutions)
+
+	__VOID__     = 0
+	__VISITED__    = 1
+	__N_VISITED__   = 0
+
+	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
+
+	depth = cutoff_depth+1
+	tree_size = 0
+	number_of_solutions = 0
+
+	while true
+		#%println(local_cycle)
+
+		local_permutation[depth] = local_permutation[depth]+1
+
+		if local_permutation[depth] == (size+1)
+			local_permutation[depth] = __VOID__
+		else
+			if (local_visited[local_permutation[depth]] == 0 && queens_is_valid_configuration(local_permutation,depth))
+
+				local_visited[local_permutation[depth]] = __VISITED__
+				depth +=1
+				tree_size+=1
+
+				if depth == size+1 ##complete solution -- full, feasible and valid solution
+					number_of_solutions+=1
+					#println(local_visited, " ", local_permutation)
+				else
+					continue
+				end
+			else
+				continue
+			end #elif
+		end
+
+		depth -= 1
+		local_visited[local_permutation[depth]] = __N_VISITED__
+
+		if depth < cutoff_depth+1
+			break
+		end #if depth<2
+	end
+
+
+return 
+
+end #queens tree explorer
+
+
+
+function queens_sgpu_caller(size,cutoff_depth)
+
+	print("Starting single-GPU-based N-Queens of size ")
+	println(size-1)
+
+
+	for device in CUDA.devices()
+		@show capability(device)
+	end
+	#subproblems = [Subproblem(size) for i in 1:1000000]
+
+	#partial search -- generate some feasible valid and incomplete solutions
+	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
+	#end of the partial search
+
+	number_of_subproblems = metrics.number_of_solutions
+	partial_tree_size = metrics.partial_tree_size
+	number_of_solutions = 0
+	metrics.number_of_solutions = 0
+	
+	prefixes_h = zeros(Int64, cutoff_depth*number_of_subproblems)
+	controls_h = zeros(Int64, cutoff_depth*number_of_subproblems)
+	println(cutoff_depth*number_of_subproblems)
+
+	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, prefixes_h,controls_h,subproblems)
+
+	prefixes_d = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
+	controls_d = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
+	solutions_d = CUDA.zeros(number_of_subproblems)
+	tree_size_d = CUDA.zeros(number_of_subproblems)
+
+	prefixes_d = copy(prefixes_h)
+	controls_d = copy(controls_h)
+
+
+
+	println(prefixes_h, controls_h)
+	println(prefixes_d, controls_d)
+	
+
+	println("\n###########################")
+	println("N-Queens size: ", size-1, "\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
+end #caller
+
 
 function main(ARGS)
 	println(ARGS)
@@ -283,7 +397,14 @@ function main(ARGS)
 		@time begin
 			cutoff_depth = parse(Int64, ARGS[3])
 			num_threads =  parse(Int64, ARGS[4])
-			queens_caller(size+1,cutoff_depth+1, num_threads)
+			queens_mcore_caller(size+1,cutoff_depth+1, num_threads)
+		end
+		else
+			if mode == 3
+				@time begin
+				cutoff_depth = parse(Int64, ARGS[3])
+				queens_sgpu_caller(size+1,cutoff_depth+1)
+			end
 		end
 	end
 
