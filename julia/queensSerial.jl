@@ -301,7 +301,7 @@ end ##queens_is_valid_conf
 
 
 
-function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d, local_permutation_d, local_visited_d)
+function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d,  local_permutation_d, local_visited_d)
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -331,12 +331,14 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 		while true
 			#%println(local_cycle)
 
-			local_permutation_d[stride_s + depth] = local_permutation_d[depth]+1
+			local_permutation_d[stride_s + depth] = local_permutation_d[stride_s + depth]+1
 
 			if local_permutation_d[stride_s + depth] == (size+1)
 				local_permutation_d[stride_s + depth] = __VOID__
 			else
-				if (local_visited_d[stride_s + local_permutation_d[stride_s + depth]] == 0 && gpu_queens_is_valid_configuration(local_permutation_d[stride_s],depth,stride_s))
+				if (local_visited_d[stride_s + local_permutation_d[stride_s + depth]] == 0)
+
+					#  && gpu_queens_is_valid_configuration(local_permutation_d,depth,stride_s)
 
 					local_visited_d[stride_s + local_permutation_d[stride_s + depth]] = __VISITED__
 					depth +=1
@@ -403,20 +405,26 @@ function queens_sgpu_caller(size,cutoff_depth)
 	
 	subpermutation_h = zeros(Int64, cutoff_depth*number_of_subproblems)
 	controls_h = zeros(Int64, cutoff_depth*number_of_subproblems)
+	number_of_solutions_h = zeros(Int64, number_of_subproblems)
+	tree_size_h = zeros(Int64, number_of_subproblems)
+
 	println(cutoff_depth*number_of_subproblems)
 
 	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h,controls_h,subproblems)
 
-	local_visited_d            = CuArray{Int64}(undef,  size*number_of_subproblems)
-	local_control_control_d    = CuArray{Int64}(undef,  size*number_of_subproblems)
-	local_visited_d            = CUDA.zeros(size*number_of_subproblems)
-	local_control_control_d    = CUDA.zeros(size*number_of_subproblems)
+	#we cant allocate in the stack of the thread...
+	local_permutation_d            = CuArray{Int64}(undef,  size*number_of_subproblems)
+	local_control_d                = CuArray{Int64}(undef,  size*number_of_subproblems)
+	local_permutation_d            = CUDA.zeros(Int64,size*number_of_subproblems)
+	local_control_d                = CUDA.zeros(Int64,size*number_of_subproblems)
 
-	subpermutation_d = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
-	controls_d       = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
+	subpermutation_d      = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
+	controls_d            = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
+	number_of_solutions_d = CuArray{Int64}(undef,  number_of_subproblems)
+	tree_size_d           = CuArray{Int64}(undef,  number_of_subproblems)
 
-	number_of_solutions_d = CUDA.zeros(number_of_subproblems)
-	tree_size_d = CUDA.zeros(number_of_subproblems)
+	number_of_solutions_d = CUDA.zeros(Int64,number_of_subproblems)
+	tree_size_d = CUDA.zeros(Int64,number_of_subproblems)
 
 	# copy from the CPU to the GPU
 	copyto!(subpermutation_d, subpermutation_h)
@@ -426,16 +434,12 @@ function queens_sgpu_caller(size,cutoff_depth)
 	#subpermutation_d = copy(subpermutation_h)
 	#controls_d = copy(controls_h)
 
-	println(subpermutation_h, controls_h)
-	println(subpermutation_d, controls_d)
-
-	@cuda threads=number_of_subproblems gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, local_visited_d, local_control_control_d)
+	@cuda threads=number_of_subproblems gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, local_permutation_d, local_control_d)
 
 	#from de gpu to the cpu
 	copyto!(number_of_solutions_h, number_of_solutions_d)
 	#from de gpu to the cpu
 	copyto!(tree_size_h, tree_size_d)
-
 
 	number_of_solutions = sum(number_of_solutions_h)
 	partial_tree_size += sum(tree_size_h)
