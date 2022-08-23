@@ -314,7 +314,8 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 
 		stride_c = index*cutoff_depth
 		stride_s = index*size
-
+##@OBS> Cant allocate this vector on execution time....
+##
 #		local_visited = zeros(Int64,25)
 #		local_permutation = zeros(Int64,25)
 
@@ -362,10 +363,10 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 				break
 			end #if depth<2
 		end
-		number_of_solutions_d[index] = number_of_solutions 
+		number_of_solutions_d[index] = number_of_solutions
 		tree_size_d[index] = tree_size
 	end #if
-return 
+return
 
 end #queens tree explorer
 
@@ -377,7 +378,7 @@ function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefix
 		for j in 1:cutoff_depth
 			prefixes[stride+j] = subproblems[sub+1].subproblem_partial_permutation[j]
 			controls[stride+j] = subproblems[sub+1].subproblem_is_visited[j]
-		end 
+		end
 	end
 
 end
@@ -402,7 +403,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 	partial_tree_size = metrics.partial_tree_size
 	number_of_solutions = 0
 	metrics.number_of_solutions = 0
-	
+
 	subpermutation_h = zeros(Int64, cutoff_depth*number_of_subproblems)
 	controls_h = zeros(Int64, cutoff_depth*number_of_subproblems)
 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
