@@ -319,6 +319,8 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 #		local_visited = zeros(Int64,25)
 #		local_permutation = zeros(Int64,25)
 
+	#@OBS> so... I allocate on CPU memory for the cuda kernel...
+	### then I get the values on GPU.
 		for j in 1:cutoff_depth
 			local_visited_d[stride_s+j] = controls_d[stride_c+j]
 			local_permutation_d[stride_s+j] = permutation_d[stride_c+j]
@@ -338,7 +340,8 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 				local_permutation_d[stride_s + depth] = __VOID__
 			else
 				if (local_visited_d[stride_s + local_permutation_d[stride_s + depth]] == 0)
-
+					##@OBS> I cant access the method because I face type problems.
+					### So I removed it just to see what to to.
 					#  && gpu_queens_is_valid_configuration(local_permutation_d,depth,stride_s)
 
 					local_visited_d[stride_s + local_permutation_d[stride_s + depth]] = __VISITED__
@@ -371,6 +374,8 @@ return
 end #queens tree explorer
 
 
+##@OBS> this method gets the information from the Subproblem and put them into two vectors.
+#### it is easier to work on gpu like this...
 function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefixes, controls,subproblems)
 
 	for sub in 0:num_subproblems-1
@@ -385,6 +390,22 @@ end
 
 
 function queens_sgpu_caller(size,cutoff_depth)
+
+	##@OBS> This is the GPU-based implementation.
+	##### As one can see, it is the same as the GPU-based, but the granularity is different --
+	###### One thread of the GPU processes one subproblem.
+	#### The beginning is the same - partial search 	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
+	####
+	#### then, I need some space to retrieve the results from the gpu:
+	#### 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
+	#### tree_size_h = zeros(Int64, number_of_subproblems)
+
+	#### and subpermutation_h controls_h I use to remove the information I need from the subproblem data structure.
+	#### I need the partial permutation and the vector that guides the search (controls_h)
+	#### I call 	gpu_queens_subproblems_organizer! to get this information from the subproblems.
+
+
+	####Then, go to line 437....
 
 	print("Starting single-GPU-based N-Queens of size ")
 	println(size-1)
@@ -414,13 +435,19 @@ function queens_sgpu_caller(size,cutoff_depth)
 	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h,controls_h,subproblems)
 
 	#we cant allocate in the stack of the thread...
+	#### the ''local'' vectors _d are used by each thread to enumerate the solution space of one subproblem.
 	local_permutation_d            = CuArray{Int64}(undef,  size*number_of_subproblems)
 	local_control_d                = CuArray{Int64}(undef,  size*number_of_subproblems)
 	local_permutation_d            = CUDA.zeros(Int64,size*number_of_subproblems)
 	local_control_d                = CUDA.zeros(Int64,size*number_of_subproblems)
 
+	#### the subpermutation_d is the memory allocated to keep all subpermutations and the control vectors...
+	##### Maybe I could have done it in a smarter way...
+
 	subpermutation_d      = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
 	controls_d            = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
+
+	#### Tree size and number of solutions is to get the metrics from the search.
 	number_of_solutions_d = CuArray{Int64}(undef,  number_of_subproblems)
 	tree_size_d           = CuArray{Int64}(undef,  number_of_subproblems)
 
