@@ -4,9 +4,10 @@
 ##@TODO: Queens -- we receive the three one unity bigger than it should be. Lets see this problem afterwards.
 ###
 
-using Pkg
-Pkg.add("CUDA")
 using CUDA
+using StaticArrays
+
+
 
 mutable struct Subproblem
 
@@ -300,32 +301,53 @@ function gpu_queens_is_valid_configuration(board::Union{Number, AbstractArray{<:
 end ##queens_is_valid_conf
 
 
+#verifies whether a given solution/incomplete solution is feasible
+function new_gpu_queens_is_valid_configuration(board::Union{Number, AbstractArray{<:Number}}, roll)::Bool
 
-function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d,  local_permutation_d, local_visited_d)
+	for i=2:roll-1
+		if (board[i] == board[roll])
+			return false
+		end
+	end
 
-	__VOID__     = 0
-	__VISITED__    = 1
-	__N_VISITED__   = 0
+	ld = board[roll]
+	rd = board[roll]
+
+	for j=(roll-1):-1:2
+		ld -= 1
+		rd += 1
+		if (board[j] == ld || board[j] == rd)
+			return false
+		end
+	end
+
+	return true
+end ##queens_is_valid_conf
+
+
+function gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d)
+
+	__VOID__      = 0
+	__VISITED__   = 1
+	__N_VISITED__ = 0
+
 
 	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
-	index = threadIdx().x
+	index = blockIdx().x * blockDim().x + threadIdx().x
 
 	if index<number_of_subproblems
 
 		stride_c = index*cutoff_depth
-		stride_s = index*size
 ##@OBS> Cant allocate this vector on execution time....
-##
-#		local_visited = zeros(Int64,25)
-#		local_permutation = zeros(Int64,25)
+		local_visited     = MVector{20,Int64}(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+		local_permutation = MVector{20,Int64}(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
 
 	#@OBS> so... I allocate on CPU memory for the cuda kernel...
 	### then I get the values on GPU.
 		for j in 1:cutoff_depth
-			local_visited_d[stride_s+j] = controls_d[stride_c+j]
-			local_permutation_d[stride_s+j] = permutation_d[stride_c+j]
+			local_visited[j] = controls_d[stride_c+j]
+			local_permutation[j] = permutation_d[stride_c+j]
 		end
-
 
 		depth = cutoff_depth+1
 		tree_size = 0
@@ -334,17 +356,14 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 		while true
 			#%println(local_cycle)
 
-			local_permutation_d[stride_s + depth] = local_permutation_d[stride_s + depth]+1
+			local_permutation[depth] = local_permutation[depth]+1
 
-			if local_permutation_d[stride_s + depth] == (size+1)
-				local_permutation_d[stride_s + depth] = __VOID__
+			if local_permutation[depth] == (size+1)
+				local_permutation[depth] = __VOID__
 			else
-				if (local_visited_d[stride_s + local_permutation_d[stride_s + depth]] == 0)
-					##@OBS> I cant access the method because I face type problems.
-					### So I removed it just to see what to to.
-					#  && gpu_queens_is_valid_configuration(local_permutation_d,depth,stride_s)
+				if (local_visited[local_permutation[depth]] == 0 && queens_is_valid_configuration(local_permutation,depth))
 
-					local_visited_d[stride_s + local_permutation_d[stride_s + depth]] = __VISITED__
+					local_visited[local_permutation[depth]] = __VISITED__
 					depth +=1
 					tree_size+=1
 
@@ -360,7 +379,7 @@ function gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, perm
 			end
 
 			depth -= 1
-			local_visited_d[stride_s + local_permutation_d[stride_s + depth]] = __N_VISITED__
+			local_visited[local_permutation[depth]] = __N_VISITED__
 
 			if depth < cutoff_depth+1
 				break
@@ -391,21 +410,8 @@ end
 
 function queens_sgpu_caller(size,cutoff_depth)
 
-	##@OBS> This is the GPU-based implementation.
-	##### As one can see, it is the same as the GPU-based, but the granularity is different --
-	###### One thread of the GPU processes one subproblem.
-	#### The beginning is the same - partial search 	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
-	####
-	#### then, I need some space to retrieve the results from the gpu:
-	#### 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
-	#### tree_size_h = zeros(Int64, number_of_subproblems)
 
-	#### and subpermutation_h controls_h I use to remove the information I need from the subproblem data structure.
-	#### I need the partial permutation and the vector that guides the search (controls_h)
-	#### I call 	gpu_queens_subproblems_organizer! to get this information from the subproblems.
-
-
-	####Then, go to line 437....
+	__BLOCK_SIZE_ = 128
 
 	print("Starting single-GPU-based N-Queens of size ")
 	println(size-1)
@@ -430,16 +436,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
 	tree_size_h = zeros(Int64, number_of_subproblems)
 
-	println(cutoff_depth*number_of_subproblems)
-
 	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h,controls_h,subproblems)
-
-	#we cant allocate in the stack of the thread...
-	#### the ''local'' vectors _d are used by each thread to enumerate the solution space of one subproblem.
-	local_permutation_d            = CuArray{Int64}(undef,  size*number_of_subproblems)
-	local_control_d                = CuArray{Int64}(undef,  size*number_of_subproblems)
-	local_permutation_d            = CUDA.zeros(Int64,size*number_of_subproblems)
-	local_control_d                = CUDA.zeros(Int64,size*number_of_subproblems)
 
 	#### the subpermutation_d is the memory allocated to keep all subpermutations and the control vectors...
 	##### Maybe I could have done it in a smarter way...
@@ -461,9 +458,10 @@ function queens_sgpu_caller(size,cutoff_depth)
 
 	#subpermutation_d = copy(subpermutation_h)
 	#controls_d = copy(controls_h)
-
-	@cuda threads=number_of_subproblems gpu_queens_tree_explorer(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, local_permutation_d, local_control_d)
-
+	num_blocks = ceil(Int, number_of_subproblems/__BLOCK_SIZE_) + (number_of_subproblems% __BLOCK_SIZE_)
+	#@time begin
+		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d)
+	#end
 	#from de gpu to the cpu
 	copyto!(number_of_solutions_h, number_of_solutions_d)
 	#from de gpu to the cpu
@@ -494,10 +492,10 @@ function main(ARGS)
 		else
 			if mode == 3
 				@time begin
-				cutoff_depth = parse(Int64, ARGS[3])
-				queens_sgpu_caller(size+1,cutoff_depth+1)
+					cutoff_depth = parse(Int64, ARGS[3])
+					queens_sgpu_caller(size+1,cutoff_depth+1)
+				end
 			end
-		end
 	end
 
 	#subproblems = Array{Subproblem, 1}(undef, 99999)
