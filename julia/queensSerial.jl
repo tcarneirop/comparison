@@ -333,7 +333,9 @@ function gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, per
 
 
 	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
-	index = blockIdx().x * blockDim().x + threadIdx().x
+	index = (blockIdx().x-1) * blockDim().x + (threadIdx().x)
+	#index = threadIdx().x
+
 
 	if index<number_of_subproblems
 
@@ -420,6 +422,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 	for device in CUDA.devices()
 		@show capability(device)
 	end
+
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
@@ -458,7 +461,9 @@ function queens_sgpu_caller(size,cutoff_depth)
 
 	#subpermutation_d = copy(subpermutation_h)
 	#controls_d = copy(controls_h)
-	num_blocks = ceil(Int, number_of_subproblems/__BLOCK_SIZE_) + (number_of_subproblems% __BLOCK_SIZE_)
+	num_blocks = ceil(Int, number_of_subproblems/__BLOCK_SIZE_)
+
+	print("Number of subproblems:", number_of_subproblems, " - Number of blocks:  ", num_blocks)
 	#@time begin
 		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d)
 	#end
