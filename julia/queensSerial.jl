@@ -479,31 +479,17 @@ function queens_sgpu_caller(size,cutoff_depth)
 	println("N-Queens size: ", size-1, "\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
 
-
-function main(ARGS)
-	println(ARGS)
-	mode = parse(Int64, ARGS[1])
-	size = parse(Int64,ARGS[2])
-
-	## mode == 1, serial, mode == 2, mcore (+cutoff depth + numthreads), mode == 3, single-gpu (+cutoff depth)
-	if mode == 1
-		@time queens_serial(size+1)
-	elseif mode == 2
-		@time begin
-			cutoff_depth = parse(Int64, ARGS[3])
-			num_threads =  parse(Int64, ARGS[4])
-			queens_mcore_caller(size+1,cutoff_depth+1, num_threads)
-		end
-		else
-			if mode == 3
-				@time begin
-					cutoff_depth = parse(Int64, ARGS[3])
-					queens_sgpu_caller(size+1,cutoff_depth+1)
-				end
-			end
-	end
-
-	#subproblems = Array{Subproblem, 1}(undef, 99999)
+macro serial(size)
+	@time queens_serial(size+1)
 end
 
-main(ARGS)
+macro multicore(size, cutoff_depth, num_threads)
+	queens_mcore_caller(size+1,cutoff_depth+1, num_threads)
+end
+
+macro gpu_cuda(size, cutoff_depth)
+	@time begin
+		queens_sgpu_caller(size+1,cutoff_depth+1)
+	end
+end
+
