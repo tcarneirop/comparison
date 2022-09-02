@@ -325,7 +325,7 @@ function new_gpu_queens_is_valid_configuration(board::Union{Number, AbstractArra
 end ##queens_is_valid_conf
 
 
-function gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d)
+function gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
 
 	__VOID__      = 0
 	__VISITED__   = 1
@@ -333,13 +333,13 @@ function gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, per
 
 
 	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
-	index = (blockIdx().x-1) * blockDim().x + (threadIdx().x)
+	index =  (blockIdx().x - 1) * blockDim().x + threadIdx().x
 	#index = threadIdx().x
 
 
-	if index<number_of_subproblems
-
-		stride_c = index*cutoff_depth
+	if index<=number_of_subproblems
+		indexes_d[index] = index
+		stride_c = (index-1)*cutoff_depth
 ##@OBS> Cant allocate this vector on execution time....
 		local_visited     = MVector{20,Int64}(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
 		local_permutation = MVector{20,Int64}(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
@@ -413,7 +413,7 @@ end
 function queens_sgpu_caller(size,cutoff_depth)
 
 
-	__BLOCK_SIZE_ = 128
+	__BLOCK_SIZE_ = 64
 
 	print("Starting single-GPU-based N-Queens of size ")
 	println(size-1)
@@ -434,6 +434,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 	number_of_solutions = 0
 	metrics.number_of_solutions = 0
 
+	indexes_h = subpermutation_h = zeros(Int32, number_of_subproblems)
 	subpermutation_h = zeros(Int64, cutoff_depth*number_of_subproblems)
 	controls_h = zeros(Int64, cutoff_depth*number_of_subproblems)
 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
@@ -443,7 +444,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 
 	#### the subpermutation_d is the memory allocated to keep all subpermutations and the control vectors...
 	##### Maybe I could have done it in a smarter way...
-
+	indexes_d             = CuArray{Int32}(undef,  number_of_subproblems)
 	subpermutation_d      = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
 	controls_d            = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
 
@@ -451,6 +452,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 	number_of_solutions_d = CuArray{Int64}(undef,  number_of_subproblems)
 	tree_size_d           = CuArray{Int64}(undef,  number_of_subproblems)
 
+	indexes_d = CUDA.zeros(Int32,number_of_subproblems)
 	number_of_solutions_d = CUDA.zeros(Int64,number_of_subproblems)
 	tree_size_d = CUDA.zeros(Int64,number_of_subproblems)
 
@@ -465,15 +467,19 @@ function queens_sgpu_caller(size,cutoff_depth)
 
 	print("Number of subproblems:", number_of_subproblems, " - Number of blocks:  ", num_blocks)
 	#@time begin
-		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d)
+		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
 	#end
 	#from de gpu to the cpu
 	copyto!(number_of_solutions_h, number_of_solutions_d)
 	#from de gpu to the cpu
 	copyto!(tree_size_h, tree_size_d)
 
+	copyto!(indexes_h, indexes_d)
 	number_of_solutions = sum(number_of_solutions_h)
 	partial_tree_size += sum(tree_size_h)
+
+	print("\n\n")
+	print(indexes_h)
 
 	println("\n###########################")
 	println("N-Queens size: ", size-1, "\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
@@ -492,4 +498,3 @@ macro gpu_cuda(size, cutoff_depth)
 		queens_sgpu_caller(size+1,cutoff_depth+1)
 	end
 end
-
