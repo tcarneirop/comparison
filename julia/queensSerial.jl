@@ -65,8 +65,8 @@ function queens_serial(size)
 	local_visited = zeros(Int64,size)
 	local_permutation = zeros(Int64,size)
 
-	println(local_visited)
-	println(local_permutation)
+	#println(local_visited)
+	#println(local_permutation)
 
 	while true
 		#%println(local_cycle)
@@ -325,30 +325,32 @@ function new_gpu_queens_is_valid_configuration(board::Union{Number, AbstractArra
 end ##queens_is_valid_conf
 
 
-function gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
+function gpu_queens_tree_explorer!(::Val{size}, cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d) where {size}
 
 	__VOID__      = 0
 	__VISITED__   = 1
 	__N_VISITED__ = 0
 
-
 	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
 	index =  (blockIdx().x - 1) * blockDim().x + threadIdx().x
 	#index = threadIdx().x
-
 
 	if index<=number_of_subproblems
 		indexes_d[index] = index
 		stride_c = (index-1)*cutoff_depth
 ##@OBS> Cant allocate this vector on execution time....
-		local_visited     = MVector{20,Int64}(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-		local_permutation = MVector{20,Int64}(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+
+		local_visited     = MArray{Tuple{size+1},Int64}(undef)
+		local_permutation = MArray{Tuple{size+1},Int64}(undef)
+
+		local_visited     .= 0
+		local_permutation .= 0
 
 	#@OBS> so... I allocate on CPU memory for the cuda kernel...
 	### then I get the values on GPU.
 		for j in 1:cutoff_depth
 			local_visited[j] = controls_d[stride_c+j]
-			local_permutation[j] = permutation_d[stride_c+j]
+			local_permutation[j] = permutation_d[stride_c+j]	
 		end
 
 		depth = cutoff_depth+1
@@ -410,14 +412,12 @@ function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefix
 end
 
 
-function queens_sgpu_caller(size,cutoff_depth)
+function queens_sgpu_caller(size, cutoff_depth, __BLOCK_SIZE_)
 
-
-	__BLOCK_SIZE_ = 64
+	#__BLOCK_SIZE_ = 1024
 
 	print("Starting single-GPU-based N-Queens of size ")
 	println(size-1)
-
 
 	for device in CUDA.devices()
 		@show capability(device)
@@ -426,7 +426,7 @@ function queens_sgpu_caller(size,cutoff_depth)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
-	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
+	(subproblems, metrics) = @time queens_partial_search!(size, cutoff_depth)
 	#end of the partial search
 
 	number_of_subproblems = metrics.number_of_solutions
@@ -465,9 +465,9 @@ function queens_sgpu_caller(size,cutoff_depth)
 	#controls_d = copy(controls_h)
 	num_blocks = ceil(Int, number_of_subproblems/__BLOCK_SIZE_)
 
-	print("Number of subproblems:", number_of_subproblems, " - Number of blocks:  ", num_blocks)
+	@info "Number of subproblems:", number_of_subproblems, " - Number of blocks:  ", num_blocks
 	#@time begin
-		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(size,cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
+		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(Val(size),cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
 	#end
 	#from de gpu to the cpu
 	copyto!(number_of_solutions_h, number_of_solutions_d)
@@ -478,8 +478,8 @@ function queens_sgpu_caller(size,cutoff_depth)
 	number_of_solutions = sum(number_of_solutions_h)
 	partial_tree_size += sum(tree_size_h)
 
-	print("\n\n")
-	print(indexes_h)
+	#print("\n\n")
+	#print(indexes_h)
 
 	println("\n###########################")
 	println("N-Queens size: ", size-1, "\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
@@ -493,8 +493,8 @@ macro multicore(size, cutoff_depth, num_threads)
 	queens_mcore_caller(size+1,cutoff_depth+1, num_threads)
 end
 
-macro gpu_cuda(size, cutoff_depth)
+macro gpu_cuda(size, cutoff_depth, __BLOCK_SIZE_)
 	@time begin
-		queens_sgpu_caller(size+1,cutoff_depth+1)
+		queens_sgpu_caller(size+1,cutoff_depth+1, __BLOCK_SIZE_)
 	end
 end
