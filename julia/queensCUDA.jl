@@ -82,8 +82,8 @@ function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefix
 	for sub in 0:num_subproblems-1
 		stride = sub*cutoff_depth
 		for j in 1:cutoff_depth
-			prefixes[stride+j] = subproblems[sub+1].subproblem_partial_permutation[j]
-			controls[stride+j] = subproblems[sub+1].subproblem_is_visited[j]
+			prefixes[stride+j] = subproblems[sub+1][2][j] # subproblem_partial_permutation
+			controls[stride+j] = subproblems[sub+1][1][j] # subproblem_is_visited
 		end
 	end
 
@@ -108,7 +108,7 @@ function queens_sgpu_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE
 	#end of the partial search
 
 	number_of_solutions = 0
-	metrics.number_of_solutions = 0
+	#metrics.number_of_solutions = 0
 
 	indexes_h = subpermutation_h = zeros(Int32, number_of_subproblems)
 	subpermutation_h = zeros(Int64, cutoff_depth*number_of_subproblems)
@@ -116,7 +116,7 @@ function queens_sgpu_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE
 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
 	tree_size_h = zeros(Int64, number_of_subproblems)
 
-	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h,subproblems)
+	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h, subproblems)
 
 	#### the subpermutation_d is the memory allocated to keep all subpermutations and the control vectors...
 	##### Maybe I could have done it in a smarter way...

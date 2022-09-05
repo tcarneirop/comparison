@@ -1,4 +1,3 @@
-
 function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutation)
 
 	__VOID__     = 0
@@ -44,7 +43,7 @@ function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutatio
 		end #if depth<2
 	end
 
-    return (number_of_solutions, tree_size)
+return (number_of_solutions, tree_size)
 
 end #queens tree explorer
 
@@ -58,10 +57,7 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 	(subproblems, number_of_subproblems, partial_tree_size) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
 	#end of the partial search
 
-	#number_of_solutions = 0
-	#metrics.number_of_solutions = 0
-	#println(number_of_subproblems)
-	#println(metrics)
+	println(number_of_subproblems)
 
 	thread_tree_size = zeros(Int64, num_threads)
 	thread_num_sols  = zeros(Int64, num_threads)
@@ -76,7 +72,7 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 			println("LOOP " * string(ii))
 			local local_thread_id = ii
 			local local_load = thread_load[local_thread_id+1]
-			#local local_metrics = Metrics(0,0)
+			local local_metrics = Metrics(0,0)
 
 			Threads.@spawn begin
 				println("THREAD: " * string(local_thread_id) * " has " * string(local_load) * " iterations")
@@ -84,9 +80,9 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 
 					s = local_thread_id*stride + j
 
-					(number_of_solutions, partial_tree_size) = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
-					thread_tree_size[local_thread_id+1] += partial_tree_size
-					thread_num_sols[local_thread_id+1]  += number_of_solutions
+					(local_number_of_solutions, local_partial_tree_size) = queens_tree_explorer(size,cutoff_depth, subproblems[s][1]#=.subproblem_is_visited=#, subproblems[s][2]#=.subproblem_partial_permutation=#)
+					thread_tree_size[local_thread_id+1] += local_partial_tree_size
+					thread_num_sols[local_thread_id+1]  += local_number_of_solutions
 				end
 			end
 

@@ -6,13 +6,6 @@ mutable struct Subproblem
 end
 
 
-#=mutable struct Metrics
-
-  	number_of_solutions::Int64
-	partial_tree_size::Int64
-
-end
-=#
 
 function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, cutoff_depth}
 
@@ -50,7 +43,7 @@ function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, c
 
 				if depth == cutoff_depth+1 ##complete solution -- full, feasible and valid solution
 					#number_of_subproblems+=1
-                    push!(subproblems_pool, Subproblem(copy(local_visited), copy(local_permutation)))
+                    push!(subproblems_pool, (copy(local_visited), copy(local_permutation)))
 				else
 					continue
 				end
@@ -68,6 +61,10 @@ function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, c
 	end
 
 	number_of_subproblems = length(subproblems_pool)
+	#println(number_of_subproblems)
+
+	#metrics = Metrics(number_of_subproblems, tree_size)
+	#println(metrics)
 
 	return (subproblems_pool, number_of_subproblems, tree_size)
 
