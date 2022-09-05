@@ -1,6 +1,8 @@
 using CUDA
 using StaticArrays
 
+# Base -> Serial / (Parallel -> Multicore / CUDA)
+
 include("queensBase.jl")    
 include("queensSerial.jl")
 include("queensParallel.jl") # common definitions or Multicore and GPU

@@ -6,12 +6,13 @@ mutable struct Subproblem
 end
 
 
-mutable struct Metrics
+#=mutable struct Metrics
 
   	number_of_solutions::Int64
 	partial_tree_size::Int64
 
 end
+=#
 
 function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, cutoff_depth}
 
@@ -67,11 +68,7 @@ function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, c
 	end
 
 	number_of_subproblems = length(subproblems_pool)
-	println(number_of_subproblems)
 
-	metrics = Metrics(number_of_subproblems, tree_size)
-	println(metrics)
-
-	return (subproblems_pool, metrics)
+	return (subproblems_pool, number_of_subproblems, tree_size)
 
 end #queens partial

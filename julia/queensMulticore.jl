@@ -1,4 +1,5 @@
-function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutation #=s::Subproblem=#)::Metrics
+
+function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutation)
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -43,9 +44,7 @@ function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutatio
 		end #if depth<2
 	end
 
-metrics = Metrics(number_of_solutions, tree_size)
-#println(metrics)
-return metrics
+    return (number_of_solutions, tree_size)
 
 end #queens tree explorer
 
@@ -56,15 +55,13 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
-	(subproblems, metrics) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
+	(subproblems, number_of_subproblems, partial_tree_size) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
 	#end of the partial search
 
-	number_of_subproblems = metrics.number_of_solutions
-	partial_tree_size = metrics.partial_tree_size
-	number_of_solutions = 0
-	metrics.number_of_solutions = 0
-	println(number_of_subproblems)
-	println(metrics)
+	#number_of_solutions = 0
+	#metrics.number_of_solutions = 0
+	#println(number_of_subproblems)
+	#println(metrics)
 
 	thread_tree_size = zeros(Int64, num_threads)
 	thread_num_sols  = zeros(Int64, num_threads)
@@ -79,7 +76,7 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 			println("LOOP " * string(ii))
 			local local_thread_id = ii
 			local local_load = thread_load[local_thread_id+1]
-			local local_metrics = Metrics(0,0)
+			#local local_metrics = Metrics(0,0)
 
 			Threads.@spawn begin
 				println("THREAD: " * string(local_thread_id) * " has " * string(local_load) * " iterations")
@@ -87,9 +84,9 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 
 					s = local_thread_id*stride + j
 
-					local_metrics = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
-					thread_tree_size[local_thread_id+1] += local_metrics.partial_tree_size
-					thread_num_sols[local_thread_id+1]  += local_metrics.number_of_solutions
+					(number_of_solutions, partial_tree_size) = queens_tree_explorer(size,cutoff_depth, subproblems[s].subproblem_is_visited, subproblems[s].subproblem_partial_permutation)
+					thread_tree_size[local_thread_id+1] += partial_tree_size
+					thread_num_sols[local_thread_id+1]  += number_of_solutions
 				end
 			end
 

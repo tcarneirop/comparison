@@ -1,7 +1,9 @@
-
-
-
-function gpu_queens_tree_explorer!(::Val{size}, ::Val{cutoff_depth}, ::Val{number_of_subproblems}, permutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d) where {size, cutoff_depth, number_of_subproblems}
+function gpu_queens_tree_explorer!(::Val{size}, ::Val{cutoff_depth}, ::Val{number_of_subproblems}, 
+                                   permutation_d, 
+                                   controls_d, 
+                                   tree_size_d, 
+                                   number_of_solutions_d, 
+                                   indexes_d) where {size, cutoff_depth, number_of_subproblems}
 
 	__VOID__      = 0
 	__VISITED__   = 1
@@ -102,11 +104,9 @@ function queens_sgpu_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
-	(subproblems, metrics) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
+	(subproblems, number_of_subproblems, partial_tree_size) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
 	#end of the partial search
 
-	number_of_subproblems = metrics.number_of_solutions
-	partial_tree_size = metrics.partial_tree_size
 	number_of_solutions = 0
 	metrics.number_of_solutions = 0
 
