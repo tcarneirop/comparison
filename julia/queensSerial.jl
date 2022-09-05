@@ -49,15 +49,14 @@ end ##queens_is_valid_conf
 
 
 
-function queens_serial(size)
+function queens_serial(::Val{size}) where size
 
 	__VOID__     = 0
 	__VISITED__    = 1
 	__N_VISITED__   = 0
 
 	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
-	print("Starting N-Queens of size ")
-	println(size-1)
+    println("Starting N-Queens of size ", size-1)
 
 	depth = 1
 	tree_size = 0
@@ -108,7 +107,7 @@ println(number_of_solutions)
 println(tree_size)
 end #queens serial
 
-function queens_partial_search!(size, cutoff_depth)
+function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, cutoff_depth}
 
 	__VOID__     = 0
 	__VISITED__    = 1
@@ -223,14 +222,14 @@ return metrics
 
 end #queens tree explorer
 
-function queens_mcore_caller(size,cutoff_depth,num_threads)
+function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads}) where {size, cutoff_depth, num_threads}
 
 	print("Starting MCORE N-Queens of size ")
 	println(size-1)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
-	(subproblems, metrics) = @time queens_partial_search!(size,cutoff_depth)
+	(subproblems, metrics) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
 	#end of the partial search
 
 	number_of_subproblems = metrics.number_of_solutions
@@ -272,7 +271,7 @@ function queens_mcore_caller(size,cutoff_depth,num_threads)
 	number_of_solutions = sum(thread_num_sols)
 	partial_tree_size += sum(thread_tree_size)
 	println("\n###########################")
-	println("N-Queens size: ", size, "\nNumber of threads: ", num_threads ,"\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
+	println("N-Queens size: ", size-1, "\nNumber of threads: ", num_threads ,"\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
 
 
@@ -325,7 +324,7 @@ function new_gpu_queens_is_valid_configuration(board::Union{Number, AbstractArra
 end ##queens_is_valid_conf
 
 
-function gpu_queens_tree_explorer!(::Val{size}, cutoff_depth, number_of_subproblems, permutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d) where {size}
+function gpu_queens_tree_explorer!(::Val{size}, ::Val{cutoff_depth}, ::Val{number_of_subproblems}, permutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d) where {size, cutoff_depth, number_of_subproblems}
 
 	__VOID__      = 0
 	__VISITED__   = 1
@@ -353,14 +352,14 @@ function gpu_queens_tree_explorer!(::Val{size}, cutoff_depth, number_of_subprobl
 			local_permutation[j] = permutation_d[stride_c+j]	
 		end
 
-		depth = cutoff_depth+1
+		depth = cutoff_depth + 1
 		tree_size = 0
 		number_of_solutions = 0
 
 		while true
 			#%println(local_cycle)
-
-			local_permutation[depth] = local_permutation[depth]+1
+		
+			local_permutation[depth] = local_permutation[depth] + 1
 
 			if local_permutation[depth] == (size+1)
 				local_permutation[depth] = __VOID__
@@ -368,11 +367,11 @@ function gpu_queens_tree_explorer!(::Val{size}, cutoff_depth, number_of_subprobl
 				if (local_visited[local_permutation[depth]] == 0 && queens_is_valid_configuration(local_permutation,depth))
 
 					local_visited[local_permutation[depth]] = __VISITED__
-					depth +=1
-					tree_size+=1
+					depth += 1
+					tree_size += 1
 
-					if depth == size+1 ##complete solution -- full, feasible and valid solution
-						number_of_solutions+=1
+					if depth == size + 1 ##complete solution -- full, feasible and valid solution
+						number_of_solutions += 1
 						#println(local_visited, " ", local_permutation)
 					else
 						continue
@@ -392,6 +391,7 @@ function gpu_queens_tree_explorer!(::Val{size}, cutoff_depth, number_of_subprobl
 		number_of_solutions_d[index] = number_of_solutions
 		tree_size_d[index] = tree_size
 	end #if
+
 return
 
 end #queens tree explorer
@@ -412,7 +412,7 @@ function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefix
 end
 
 
-function queens_sgpu_caller(size, cutoff_depth, __BLOCK_SIZE_)
+function queens_sgpu_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}) where {size, cutoff_depth, __BLOCK_SIZE_}
 
 	#__BLOCK_SIZE_ = 1024
 
@@ -426,7 +426,7 @@ function queens_sgpu_caller(size, cutoff_depth, __BLOCK_SIZE_)
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
-	(subproblems, metrics) = @time queens_partial_search!(size, cutoff_depth)
+	(subproblems, metrics) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
 	#end of the partial search
 
 	number_of_subproblems = metrics.number_of_solutions
@@ -440,20 +440,20 @@ function queens_sgpu_caller(size, cutoff_depth, __BLOCK_SIZE_)
 	number_of_solutions_h = zeros(Int64, number_of_subproblems)
 	tree_size_h = zeros(Int64, number_of_subproblems)
 
-	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h,controls_h,subproblems)
+	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h,subproblems)
 
 	#### the subpermutation_d is the memory allocated to keep all subpermutations and the control vectors...
 	##### Maybe I could have done it in a smarter way...
-	indexes_d             = CuArray{Int32}(undef,  number_of_subproblems)
+	#indexes_d             = CuArray{Int32}(undef,  number_of_subproblems)
 	subpermutation_d      = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
 	controls_d            = CuArray{Int64}(undef,  cutoff_depth*number_of_subproblems)
 
 	#### Tree size and number of solutions is to get the metrics from the search.
-	number_of_solutions_d = CuArray{Int64}(undef,  number_of_subproblems)
-	tree_size_d           = CuArray{Int64}(undef,  number_of_subproblems)
+	#number_of_solutions_d = CuArray{Int64}(undef,  number_of_subproblems)
+	#tree_size_d           = CuArray{Int64}(undef,  number_of_subproblems)
 
 	indexes_d = CUDA.zeros(Int32,number_of_subproblems)
-	number_of_solutions_d = CUDA.zeros(Int64,number_of_subproblems)
+	number_of_solutions_d = CUDA.zeros(Int64, number_of_subproblems)
 	tree_size_d = CUDA.zeros(Int64,number_of_subproblems)
 
 	# copy from the CPU to the GPU
@@ -467,7 +467,7 @@ function queens_sgpu_caller(size, cutoff_depth, __BLOCK_SIZE_)
 
 	@info "Number of subproblems:", number_of_subproblems, " - Number of blocks:  ", num_blocks
 	#@time begin
-		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(Val(size),cutoff_depth, number_of_subproblems, subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
+		@cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(Val(size),Val(cutoff_depth), Val(number_of_subproblems), subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
 	#end
 	#from de gpu to the cpu
 	copyto!(number_of_solutions_h, number_of_solutions_d)
@@ -486,15 +486,15 @@ function queens_sgpu_caller(size, cutoff_depth, __BLOCK_SIZE_)
 end #caller
 
 macro serial(size)
-	@time queens_serial(size+1)
+	@time queens_serial(Val(size+1))
 end
 
 macro multicore(size, cutoff_depth, num_threads)
-	queens_mcore_caller(size+1,cutoff_depth+1, num_threads)
+	@time queens_mcore_caller(Val(size+1), Val(cutoff_depth+1), Val(num_threads))
 end
 
 macro gpu_cuda(size, cutoff_depth, __BLOCK_SIZE_)
 	@time begin
-		queens_sgpu_caller(size+1,cutoff_depth+1, __BLOCK_SIZE_)
+		queens_sgpu_caller(Val(size+1), Val(cutoff_depth+1), Val(__BLOCK_SIZE_))
 	end
 end
