@@ -1,12 +1,3 @@
-mutable struct Subproblem
-
-	subproblem_is_visited::Array{Int64}
- 	subproblem_partial_permutation::Array{Int64}
-
-end
-
-
-
 function queens_partial_search!(::Val{size}, ::Val{cutoff_depth}) where {size, cutoff_depth}
 
 	__VOID__     = 0

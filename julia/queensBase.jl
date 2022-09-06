@@ -1,7 +1,7 @@
 
 
 #verifies whether a given solution/incomplete solution is feasible
-function queens_is_valid_configuration(board, roll)::Bool
+function queens_is_valid_configuration(board, roll)
     #heron: why can board be a Number ? In the code, it is always accessed as an array.
     
     for i=2:roll-1
