@@ -1,48 +1,48 @@
 function queens_tree_explorer(size,cutoff_depth, local_visited, local_permutation)
+	@inbounds begin
+		__VOID__     = 0
+		__VISITED__    = 1
+		__N_VISITED__   = 0
 
-	__VOID__     = 0
-	__VISITED__    = 1
-	__N_VISITED__   = 0
+		#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
 
-	#obs: because the vector begins with 1 I need to use size+1 for N-Queens of size 'size'
+		depth = cutoff_depth+1
+		tree_size = 0
+		number_of_solutions = 0
 
-	depth = cutoff_depth+1
-	tree_size = 0
-	number_of_solutions = 0
+		while true
+			#%println(local_cycle)
 
-	while true
-		#%println(local_cycle)
+			local_permutation[depth] = local_permutation[depth]+1
 
-		local_permutation[depth] = local_permutation[depth]+1
+			if local_permutation[depth] == (size+1)
+				local_permutation[depth] = __VOID__
+			else
+				if (local_visited[local_permutation[depth]] == 0 && queens_is_valid_configuration(local_permutation, depth))
 
-		if local_permutation[depth] == (size+1)
-			local_permutation[depth] = __VOID__
-		else
-			if (local_visited[local_permutation[depth]] == 0 && queens_is_valid_configuration(local_permutation, depth))
+					local_visited[local_permutation[depth]] = __VISITED__
+					depth +=1
+					tree_size+=1
 
-				local_visited[local_permutation[depth]] = __VISITED__
-				depth +=1
-				tree_size+=1
-
-				if depth == size+1 ##complete solution -- full, feasible and valid solution
-					number_of_solutions+=1
-					#println(local_visited, " ", local_permutation)
+					if depth == size+1 ##complete solution -- full, feasible and valid solution
+						number_of_solutions+=1
+						#println(local_visited, " ", local_permutation)
+					else
+						continue
+					end
 				else
 					continue
-				end
-			else
-				continue
-			end #elif
+				end #elif
+			end
+
+			depth -= 1
+			local_visited[local_permutation[depth]] = __N_VISITED__
+
+			if depth < cutoff_depth+1
+				break
+			end #if depth<2
 		end
-
-		depth -= 1
-		local_visited[local_permutation[depth]] = __N_VISITED__
-
-		if depth < cutoff_depth+1
-			break
-		end #if depth<2
 	end
-
 return (number_of_solutions, tree_size)
 
 end #queens tree explorer
@@ -72,7 +72,6 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 			println("LOOP " * string(ii))
 			local local_thread_id = ii
 			local local_load = thread_load[local_thread_id+1]
-			local local_metrics = Metrics(0,0)
 
 			Threads.@spawn begin
 				println("THREAD: " * string(local_thread_id) * " has " * string(local_load) * " iterations")
