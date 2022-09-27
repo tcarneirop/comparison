@@ -159,61 +159,8 @@ end #caller
 
 
 
-#=
-
-
-#verifies whether a given solution/incomplete solution is feasible
-function gpu_queens_is_valid_configuration(board, roll,stride)::Bool
-
-	for i=2:roll-1
-		if (board[stride+i] == board[stride+roll])
-			return false
-		end
-	end
-
-	ld = board[stride+roll]
-	rd = board[stride+roll]
-
-	for j=(stride+roll-1):-1:2
-		ld -= 1
-		rd += 1
-		if (board[stride+j] == ld || board[stride+j] == rd)
-			return false
-		end
-	end
-
-	return true
-end ##queens_is_valid_conf
-
-
-#verifies whether a given solution/incomplete solution is feasible
-function new_gpu_queens_is_valid_configuration(board, roll)::Bool
-
-	for i=2:roll-1
-		if (board[i] == board[roll])
-			return false
-		end
-	end
-
-	ld = board[roll]
-	rd = board[roll]
-
-	for j=(roll-1):-1:2
-		ld -= 1
-		rd += 1
-		if (board[j] == ld || board[j] == rd)
-			return false
-		end
-	end
-
-	return true
-end ##queens_is_valid_conf
-
-
-
-
-function get_cpu_load(percent::Float64, num_subproblems::Int64)::Float64
-    return num_subproblems*percent;
+function get_cpu_load(percent::Float64, num_subproblems::Int64)
+    return num_subproblems*percent
 end
 
 
@@ -254,16 +201,16 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h, subproblems)
 
 
-	cpu_load = get_cpu_load(cpup, num_subproblems);
-    gpu_load = num_subproblems - cpu_load;
+	cpu_load = get_cpu_load(cpup, num_subproblems)
+    gpu_load = num_subproblems - cpu_load
     device_load = zeros(Int64, length(CUDA.devices())
-    get_load_each_gpu(gpu_load, num_gpus, device_load);
+    get_load_each_gpu(gpu_load, num_gpus, device_load)
 
 
-    println("\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
+    #println("\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
     
-    println("\nLoad of each GPU: ");
-    for device in 1:length(CUDA.devices()
+    #println("\nLoad of each GPU: ");
+    for device in 1:length(CUDA.devices())
     	println("Device - ", device, " - Load: ", device_load[device])
     end
 
