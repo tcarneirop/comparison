@@ -209,4 +209,67 @@ function new_gpu_queens_is_valid_configuration(board, roll)::Bool
 	return true
 end ##queens_is_valid_conf
 
-=#
+
+
+
+function get_cpu_load(percent::Float64, num_subproblems::Int64)::Float64
+    return num_subproblems*percent;
+end
+
+
+function get_load_each_gpu(gpu_load::Int64, number_of_gpus::Int64, device_load )
+
+	for device in 1:gpu_count
+		device_load[device] = floor(Int64, gpu_load/num_gpus)
+		if(device == gpu_count)
+			device_load[device]+= gpu_load%num_gpus
+	end
+
+end ###
+
+
+function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{cpup}) where {size, cutoff_depth, __BLOCK_SIZE_, cpup<:Real}
+	
+	println("Starting multi-GPU-mcore N-Queens of size ",size-1)
+	
+	for device in CUDA.devices()
+		@show capability(device)
+	end
+
+	#subproblems = [Subproblem(size) for i in 1:1000000]
+
+	#partial search -- generate some feasible valid and incomplete solutions
+	(subproblems, number_of_subproblems, partial_tree_size) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
+	#end of the partial search
+
+	number_of_solutions = 0
+	#metrics.number_of_solutions = 0
+
+	indexes_h = subpermutation_h = zeros(Int32, number_of_subproblems)
+	subpermutation_h = zeros(Int64, cutoff_depth*number_of_subproblems)
+	controls_h = zeros(Int64, cutoff_depth*number_of_subproblems)
+	number_of_solutions_h = zeros(Int64, number_of_subproblems)
+	tree_size_h = zeros(Int64, number_of_subproblems)
+
+	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h, subproblems)
+
+
+	cpu_load = get_cpu_load(cpup, num_subproblems);
+    gpu_load = num_subproblems - cpu_load;
+    device_load = zeros(Int64, length(CUDA.devices())
+    get_load_each_gpu(gpu_load, num_gpus, device_load);
+
+
+    println("\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
+    
+    println("\nLoad of each GPU: ");
+    for device in 1:length(CUDA.devices()
+    	println("Device - ", device, " - Load: ", device_load[device])
+    end
+
+end
+
+
+
+
+#
