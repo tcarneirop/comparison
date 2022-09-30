@@ -159,16 +159,16 @@ end #caller
 
 
 
-function get_cpu_load(percent::Float64, num_subproblems::Int64)
-    return num_subproblems*percent
+function get_cpu_load(percent::Float64, num_subproblems::Int64)::Int64
+    return floor(Int64,num_subproblems*percent)
 end
 
 
-function get_load_each_gpu(gpu_load::Int64, number_of_gpus::Int64, device_load )
+function get_load_each_gpu(gpu_load::Int64, num_gpus::Int64, device_load )
 
-	for device in 1:gpu_count
+	for device in 1:num_gpus
 		device_load[device] = floor(Int64, gpu_load/num_gpus)
-		if(device == gpu_count)
+		if(device == num_gpus)
 			device_load[device]+= gpu_load%num_gpus
 		end
 	end
@@ -204,14 +204,13 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 
 	cpu_load = get_cpu_load(cpup, number_of_subproblems)
     gpu_load = number_of_subproblems - cpu_load
-    device_load = zeros(Int64, length(CUDA.devices()))
+    device_load = zeros(Int64, num_gpus)
     get_load_each_gpu(gpu_load, num_gpus, device_load)
 
 
-    #println("\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
-    
-    #println("\nLoad of each GPU: ");
-    for device in 1:length(CUDA.devices())
+    println("\nTotal load: ",number_of_subproblems , "\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
+    println("\nLoad of each GPU: ");
+    for device in 1:num_gpus
     	println("Device - ", device, " - Load: ", device_load[device])
     end
 
