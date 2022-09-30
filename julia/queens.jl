@@ -22,5 +22,5 @@ macro gpucuda(size, cutoff_depth, __BLOCK_SIZE_)
 end
 
 macro mcoremgpucuda(size, cutoff_depth, __BLOCK_SIZE_, cpup)
-	@time queens_mgpu_mcore_caller(Val(size+1), Val(cutoff_depth+1), Val(__BLOCK_SIZE_), Val(cpup))
+	@time queens_mgpu_mcore_caller(Val(size+1), Val(cutoff_depth+1), Val(__BLOCK_SIZE_), Val(num_gpus), Val(cpup))
 end

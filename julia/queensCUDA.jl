@@ -170,12 +170,13 @@ function get_load_each_gpu(gpu_load::Int64, number_of_gpus::Int64, device_load )
 		device_load[device] = floor(Int64, gpu_load/num_gpus)
 		if(device == gpu_count)
 			device_load[device]+= gpu_load%num_gpus
+		end
 	end
 
 end ###
 
 
-function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{cpup}) where {size, cutoff_depth, __BLOCK_SIZE_, cpup<:Real}
+function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{num_gpus}, ::Val{cpup}) where {size, cutoff_depth, __BLOCK_SIZE_, num_gpus,cpup}
 	
 	println("Starting multi-GPU-mcore N-Queens of size ",size-1)
 	
@@ -201,9 +202,9 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h, subproblems)
 
 
-	cpu_load = get_cpu_load(cpup, num_subproblems)
-    gpu_load = num_subproblems - cpu_load
-    device_load = zeros(Int64, length(CUDA.devices())
+	cpu_load = get_cpu_load(cpup, number_of_subproblems)
+    gpu_load = number_of_subproblems - cpu_load
+    device_load = zeros(Int64, length(CUDA.devices()))
     get_load_each_gpu(gpu_load, num_gpus, device_load)
 
 
