@@ -92,3 +92,39 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 	println("\n###########################")
 	println("N-Queens size: ", size-1, "\nNumber of threads: ", num_threads ,"\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
+
+
+function queens_mgpu_mcore_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads}, ::Val{number_of_subproblems}, subproblems) where {size, cutoff_depth, num_threads,number_of_subproblems}
+
+	thread_tree_size = zeros(Int64, num_threads)
+	thread_num_sols  = zeros(Int64, num_threads)
+	thread_load = fill(div(number_of_subproblems, num_threads), num_threads)
+	stride = div(number_of_subproblems, num_threads)
+	println(thread_load)
+	thread_load[num_threads] += mod(number_of_subproblems, num_threads)
+
+	@sync begin
+		for ii in 0:(num_threads-1)
+
+			println("LOOP " * string(ii))
+			local local_thread_id = ii
+			local local_load = thread_load[local_thread_id+1]
+
+			Threads.@spawn begin
+				println("THREAD: " * string(local_thread_id) * " has " * string(local_load) * " iterations")
+				for j in 1:local_load
+
+					s = local_thread_id*stride + j
+
+					(local_number_of_solutions, local_partial_tree_size) = queens_tree_explorer(size,cutoff_depth, subproblems[s][1]#=.subproblem_is_visited=#, subproblems[s][2]#=.subproblem_partial_permutation=#)
+					thread_tree_size[local_thread_id+1] += local_partial_tree_size
+					thread_num_sols[local_thread_id+1]  += local_number_of_solutions
+				end
+			end
+
+		end
+	end
+	mcore_number_of_solutions = sum(thread_num_sols)
+	mcore_tree_size += sum(thread_tree_size)
+	return(mcore_number_of_solutions, mcore_tree_size)	
+end #caller

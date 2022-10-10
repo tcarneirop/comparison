@@ -176,7 +176,8 @@ function get_load_each_gpu(gpu_load::Int64, num_gpus::Int64, device_load )
 end ###
 
 
-function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{num_gpus}, ::Val{cpup}) where {size, cutoff_depth, __BLOCK_SIZE_, num_gpus,cpup}
+
+function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{num_gpus}, ::Val{cpup}, ::Val{num_threads}) where {size, cutoff_depth, __BLOCK_SIZE_, num_gpus,cpup}
 	
 	println("Starting multi-GPU-mcore N-Queens of size ",size-1)
 	
@@ -213,6 +214,19 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
     for device in 1:num_gpus
     	println("Device - ", device, " - Load: ", device_load[device])
     end
+
+	@sync begin
+		for gpu_dev in 1:num_gpus
+			@async begin
+				device!(gpu_dev)
+				# do work on GPU 0 here
+			end
+		end
+		@async begin
+			#problem size, cutoff, num threads for the mcore part, number of subproblems and the pool
+			queens_mgpu_mcore_mcore_caller(size,cutoff_depth,num_threads,cpu_load,subproblems) 
+		end
+	end
 
 end
 
