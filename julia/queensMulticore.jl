@@ -93,8 +93,9 @@ function queens_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads})
 	println("N-Queens size: ", size-1, "\nNumber of threads: ", num_threads ,"\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
 
+#function queens_mgpu_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads}, ::Val{number_of_subproblems},subproblems) where {size, cutoff_depth, num_threads,number_of_subproblems}
 
-function queens_mgpu_mcore_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{num_threads}, ::Val{number_of_subproblems}, subproblems) where {size, cutoff_depth, num_threads,number_of_subproblems}
+function queens_mgpu_mcore_caller(size,cutoff_depth,num_threads, number_of_subproblems,subproblems) 
 
 	thread_tree_size = zeros(Int64, num_threads)
 	thread_num_sols  = zeros(Int64, num_threads)
@@ -125,6 +126,7 @@ function queens_mgpu_mcore_mcore_caller(::Val{size},::Val{cutoff_depth},::Val{nu
 		end
 	end
 	mcore_number_of_solutions = sum(thread_num_sols)
-	mcore_tree_size += sum(thread_tree_size)
+	mcore_tree_size = sum(thread_tree_size)
+	#println(mcore_tree_size, mcore_number_of_solutions)
 	return(mcore_number_of_solutions, mcore_tree_size)	
 end #caller
