@@ -260,14 +260,13 @@ end ###
 
 
 function get_starting_point_each_gpu(cpu_load::Int64, num_devices, device_load,device_starting_point)
-	starting_point = cpu_load
 	
-	if(num_devices == 1)
-		device_starting_point[1] = starting_point +1
-	else
+	starting_point = cpu_load
+	device_starting_point[1] = starting_point +1
+	if(num_devices>1)
 		for device in 2:num_devices
-			starting_point += device_load[device]
-			device_starting_point[device] = starting_point + 1
+			
+			device_starting_point[device] = device_starting_point[device-1]+device_load[device-1]
 		end
 	end
 end ###
@@ -277,7 +276,11 @@ end ###
 function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{num_gpus}, ::Val{cpup}, ::Val{num_threads}) where {size, cutoff_depth, __BLOCK_SIZE_, num_gpus,cpup, num_threads}
 	
 	println("Starting multi-GPU-mcore N-Queens of size ",size-1)
-	
+	if num_gpus > length(CUDA.devices())
+		println("##### number of gpus set bigger thant he number of GPUS of the system\n#### Setting num gpus to ", length(CUDA.devices()),"\n")
+		#num_gpus = length(CUDA.devices())
+	end
+
 	for device in CUDA.devices()
 		@show capability(device)
 	end
@@ -304,17 +307,25 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 
 	cpu_load = get_cpu_load(cpup, number_of_subproblems)
     gpu_load = number_of_subproblems - cpu_load
+
     device_load = zeros(Int64, num_gpus)
     device_starting_position = zeros(Int64, num_gpus)
-	get_load_each_gpu(gpu_load, num_gpus, device_load)
-	get_starting_point_each_gpu(cpu_load, num_gpus, device_load, device_starting_position)
-	
+	if gpu_load > 0
+		get_load_each_gpu(gpu_load, num_gpus, device_load)
+		get_starting_point_each_gpu(cpu_load, num_gpus, device_load, device_starting_position)
+	end
 
     println("\nTotal load: ",number_of_subproblems , "\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
-    println("\nLoad of each GPU: ");
-    for device in 1:num_gpus
-    	println("Device - ", device, " - Load: ", device_load[device])
-    end
+    
+	if gpu_load > 0
+		println("\nLoad of each GPU: ");
+		for device in 1:num_gpus
+    		println("Device - ", device, " - Load: ", device_load[device])
+   		end
+		for device in 1:num_gpus
+    		println("Starting point device - ", device, " - ", device_starting_position[device])
+    	end
+	end
 
 	@sync begin
 
