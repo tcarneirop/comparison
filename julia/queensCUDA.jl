@@ -159,6 +159,9 @@ end #caller
 
 
 #####Obs::: wrong here...
+#####Obs::: wrong here...
+######Obs::: wrong here...Obs::: wrong here...
+######Obs::: wrong here...
 function queens_mcpu_mgpu_subproblems_organizer!(cutoff_depth, num_subproblems, prefixes, controls,subproblems, starting_point)
 
 	for sub in 0:num_subproblems-1
@@ -233,6 +236,7 @@ function queens_mcpu_mgpu_gpu_caller(size, cutoff_depth,
 	#print("\n\n")
 	#print(indexes_h)
 
+	return (number_of_solutions,partial_tree_size)
 	println("\n###########################")
 	println("N-Queens size: ", size-1, "\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
@@ -284,6 +288,8 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 	(subproblems, number_of_subproblems, partial_tree_size) = @time queens_partial_search!(Val(size), Val(cutoff_depth))
 	#end of the partial search
 
+	tree_each_task = zeros(Int64,num_gpus+1)
+	sols_each_task = zeros(Int64,num_gpus+1)
 	number_of_solutions = 0
 	#metrics.number_of_solutions = 0
 
@@ -311,25 +317,29 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
     end
 
 	@sync begin
+
 		
 		if num_gpus>0 && gpu_load>0
 			for gpu_dev in 1:num_gpus
 				@async begin
 					device!(gpu_dev-1)
 					println("gpu: ", gpu_dev-1)
-					queens_mcpu_mgpu_gpu_caller(size, cutoff_depth, __BLOCK_SIZE_, device_load[gpu_dev],
+					(tree_each_task[gpu_dev], sols_each_task[gpu_dev]) = queens_mcpu_mgpu_gpu_caller(size, cutoff_depth, __BLOCK_SIZE_, device_load[gpu_dev],
 					device_starting_position[gpu_dev], gpu_dev, subproblems)
 					# do work on GPU 0 here
 				end
-			end
-		end #if num_gpus 
+			end##for
+		end #if num_gpus
 		@async begin
-
-			#problem size, cutoff, num threads for the mcore part, number of subproblems and the pool
-			queens_mgpu_mcore_caller(size,cutoff_depth,num_threads,cpu_load,subproblems) 
-		end
-	end
-
+			if cpu_load>0 
+				#problem size, cutoff, num threads for the mcore part, number of subproblems and the pool
+				(tree_each_task[num_gpus+1], sols_each_task[num_gpus+1]) = queens_mgpu_mcore_caller(size,cutoff_depth,num_threads,cpu_load,subproblems) 
+			end
+		end ##if
+	end##syncbegin
+	final_tree = sum(tree_each_task)
+	final_num_sols = sum(sols_each_task)
+	println("\n", " ", final_tree, " ", final_num_sols)
 end
 
 
