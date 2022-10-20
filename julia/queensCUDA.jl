@@ -89,7 +89,6 @@ function gpu_queens_subproblems_organizer!(cutoff_depth, num_subproblems, prefix
 
 end
 
-
 function queens_sgpu_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}) where {size, cutoff_depth, __BLOCK_SIZE_}
 
 	#__BLOCK_SIZE_ = 1024
@@ -100,7 +99,8 @@ function queens_sgpu_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE
 	for device in CUDA.devices()
 		@show capability(device)
 	end
-
+	#Setting up the heap
+	
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
@@ -180,8 +180,7 @@ end
 #	::Val{device}, ::Vector{subproblems}) where {size, cutoff_depth, __BLOCK_SIZE_,
 #	number_of_subproblems, starting_point, device, subproblems}
 function queens_mcpu_mgpu_gpu_caller(size, cutoff_depth, 
-	__BLOCK_SIZE_, number_of_subproblems, starting_point,
-	device, subproblems)
+	__BLOCK_SIZE_, number_of_subproblems, starting_point,subproblems)
 
 	#__BLOCK_SIZE_ = 1024
 
@@ -189,7 +188,6 @@ function queens_mcpu_mgpu_gpu_caller(size, cutoff_depth,
 	println(size-1)
 
 	#subproblems = [Subproblem(size) for i in 1:1000000]
-
 	
 	number_of_solutions = 0
 	partial_tree_size = 0
@@ -237,8 +235,6 @@ function queens_mcpu_mgpu_gpu_caller(size, cutoff_depth,
 	#print(indexes_h)
 
 	return (number_of_solutions,partial_tree_size)
-	println("\n###########################")
-	println("N-Queens size: ", size-1, "\n###########################\n" ,"\nNumber of sols: ",number_of_solutions, "\nTree size: " ,partial_tree_size,"\n\n")
 end #caller
 
 
@@ -273,18 +269,16 @@ end ###
 
 
 
-function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{num_gpus}, ::Val{cpup}, ::Val{num_threads}) where {size, cutoff_depth, __BLOCK_SIZE_, num_gpus,cpup, num_threads}
+function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOCK_SIZE_}, ::Val{param_num_gpus}, ::Val{cpup}, ::Val{num_threads}) where {size, cutoff_depth, __BLOCK_SIZE_, param_num_gpus,cpup, num_threads}
 	
+	num_gpus = param_num_gpus
 	println("Starting multi-GPU-mcore N-Queens of size ",size-1)
 	if num_gpus > length(CUDA.devices())
-		println("##### number of gpus set bigger thant he number of GPUS of the system\n#### Setting num gpus to ", length(CUDA.devices()),"\n")
-		#num_gpus = length(CUDA.devices())
+		println("########################################################################");
+		println("######## number of gpus set bigger thant he number of GPUS of the system\n######## Setting num gpus to ", length(CUDA.devices()))
+		println("########################################################################");
+		num_gpus = Int64(length(CUDA.devices()))
 	end
-
-	for device in CUDA.devices()
-		@show capability(device)
-	end
-
 	#subproblems = [Subproblem(size) for i in 1:1000000]
 
 	#partial search -- generate some feasible valid and incomplete solutions
@@ -293,18 +287,8 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 
 	tree_each_task = zeros(Int64,num_gpus+1)
 	sols_each_task = zeros(Int64,num_gpus+1)
-	number_of_solutions = 0
+
 	#metrics.number_of_solutions = 0
-
-	indexes_h = subpermutation_h = zeros(Int32, number_of_subproblems)
-	subpermutation_h = zeros(Int64, cutoff_depth*number_of_subproblems)
-	controls_h = zeros(Int64, cutoff_depth*number_of_subproblems)
-	number_of_solutions_h = zeros(Int64, number_of_subproblems)
-	tree_size_h = zeros(Int64, number_of_subproblems)
-
-	gpu_queens_subproblems_organizer!(cutoff_depth, number_of_subproblems, subpermutation_h, controls_h, subproblems)
-
-
 	cpu_load = get_cpu_load(cpup, number_of_subproblems)
     gpu_load = number_of_subproblems - cpu_load
 
@@ -315,7 +299,7 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 		get_starting_point_each_gpu(cpu_load, num_gpus, device_load, device_starting_position)
 	end
 
-    println("\nTotal load: ",number_of_subproblems , "\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - GPU load: ", gpu_load);
+    println("\nTotal load: ",number_of_subproblems , "\nTotal CPU load: ", cpu_load ,"  - CPU percent: ", cpup , " - Number of GPUS: ", num_gpus," - GPU load: ", gpu_load);
     
 	if gpu_load > 0
 		println("\nLoad of each GPU: ");
@@ -328,15 +312,13 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 	end
 
 	@sync begin
-
-		
 		if num_gpus>0 && gpu_load>0
 			for gpu_dev in 1:num_gpus
 				@async begin
 					device!(gpu_dev-1)
 					println("gpu: ", gpu_dev-1)
-					(tree_each_task[gpu_dev], sols_each_task[gpu_dev]) = queens_mcpu_mgpu_gpu_caller(size, cutoff_depth, __BLOCK_SIZE_, device_load[gpu_dev],
-					device_starting_position[gpu_dev], gpu_dev, subproblems)
+					(sols_each_task[gpu_dev],tree_each_task[gpu_dev]) = queens_mcpu_mgpu_gpu_caller(size, cutoff_depth, __BLOCK_SIZE_, device_load[gpu_dev],
+					device_starting_position[gpu_dev], subproblems)
 					# do work on GPU 0 here
 				end
 			end##for
@@ -344,11 +326,11 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 		@async begin
 			if cpu_load>0 
 				#problem size, cutoff, num threads for the mcore part, number of subproblems and the pool
-				(tree_each_task[num_gpus+1], sols_each_task[num_gpus+1]) = queens_mgpu_mcore_caller(size,cutoff_depth,num_threads,cpu_load,subproblems) 
+				(sols_each_task[num_gpus+1],tree_each_task[num_gpus+1]) = queens_mgpu_mcore_caller(size,cutoff_depth,num_threads,cpu_load,subproblems) 
 			end
 		end ##if
 	end##syncbegin
-	final_tree = sum(tree_each_task)
+	final_tree = sum(tree_each_task) + partial_tree_size
 	final_num_sols = sum(sols_each_task)
 	println("\n", " ", final_tree, " ", final_num_sols)
 end
