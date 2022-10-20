@@ -117,7 +117,7 @@ function queens_mgpu_mcore_caller(size,cutoff_depth,num_threads, number_of_subpr
 
 					s = local_thread_id*stride + j
 
-					(local_number_of_solutions, local_partial_tree_size) = queens_tree_explorer(size,cutoff_depth, subproblems[s][1]#=.subproblem_is_visited=#, subproblems[s][2]#=.subproblem_partial_permutation=#)
+					(local_number_of_solutions, local_partial_tree_size) = queens_tree_explorer(size, cutoff_depth, 1, subproblems[s][1]#=.subproblem_is_visited=#, subproblems[s][2]#=.subproblem_partial_permutation=#)
 					thread_tree_size[local_thread_id+1] += local_partial_tree_size
 					thread_num_sols[local_thread_id+1]  += local_number_of_solutions
 				end
