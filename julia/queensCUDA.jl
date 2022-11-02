@@ -221,7 +221,7 @@ function queens_mcpu_mgpu_gpu_caller(size, cutoff_depth,
 	@info "Number of subproblems:", number_of_subproblems, " - Number of blocks:  ", num_blocks
 
     @cuda threads=__BLOCK_SIZE_ blocks=num_blocks gpu_queens_tree_explorer!(Val(size),Val(cutoff_depth), Val(number_of_subproblems), subpermutation_d, controls_d, tree_size_d, number_of_solutions_d, indexes_d)
-
+	synchronize()
     #from de gpu to the cpu
 	copyto!(number_of_solutions_h, number_of_solutions_d)
 	#from de gpu to the cpu
@@ -316,6 +316,7 @@ function queens_mgpu_mcore_caller(::Val{size}, ::Val{cutoff_depth}, ::Val{__BLOC
 			for gpu_dev in 1:num_gpus
 				@async begin
 					device!(gpu_dev-1)
+					synchronize()
 					println("gpu: ", gpu_dev-1)
 					(sols_each_task[gpu_dev],tree_each_task[gpu_dev]) = queens_mcpu_mgpu_gpu_caller(size, cutoff_depth, __BLOCK_SIZE_, device_load[gpu_dev],
 					device_starting_position[gpu_dev], subproblems)
